@@ -1,0 +1,43 @@
+apiVersion: 2018-10-01
+location: westeurope
+name: aci-ipfs-vnet
+properties:
+  containers:
+  - name: ipfs
+    properties:
+      image: ipfs/go-ipfs
+      ports:
+      - port: 4001
+      - port: 5001
+      - port: 8080
+      resources:
+        requests:
+          cpu: 1.0
+          memoryInGB: 1.5
+      volumeMounts:
+      - mountPath: /data/ipfs
+        name: ipfsdatavolume
+      - mountPath: /export
+        name: ipfsexportvolume
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    type: Private
+    ports:
+    - port: 4001
+    - port: 5001
+    - port: 8080
+    #dnsNameLabel: ipfs-example
+  networkProfile:
+    id: /subscriptions/???/resourceGroups/ipfs/providers/Microsoft.Network/networkProfiles/aci-network-profile-IpfsVNet-IpfsSubnet
+  volumes:
+  - name: ipfsdatavolume
+    azureFile:
+      sharename: ipfsdata
+      storageAccountName: ???
+      storageAccountKey: ???
+  - name: ipfsexportvolume
+    azureFile:
+      sharename: ipfsexport
+      storageAccountName: ???
+      storageAccountKey: ???

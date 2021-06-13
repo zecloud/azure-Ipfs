@@ -1,0 +1,33 @@
+az network vnet create --name IpfsVNet --resource-group ipfs  --location westeurope  --address-prefix 10.0.0.0/16  --subnet-name AGSubnet  --subnet-prefix 10.0.1.0/24
+az network vnet subnet create  --name IpfsSubnet  --resource-group ipfs  --vnet-name IpfsVNet --address-prefix 10.0.2.0/24
+az network public-ip create --resource-group ipfs  --name IpfsPublicIPAddress --allocation-method Static  --sku Standard
+az container create --name appcontainer --resource-group ipfs --image mcr.microsoft.com/azuredocs/aci-helloworld --vnet IpfsVNet --subnet IpfsSubnet
+az network profile list --resource-group ipfs  --query [0].id --output tsv
+ACI_IP=$(az container show   --name appcontainer  --resource-group ipfs  --query ipAddress.ip --output tsv)
+az network application-gateway create --name IpfsAppGateway --location westeurope --resource-group ipfs --capacity 2  --sku Standard_v2  --http-settings-protocol http --public-ip-address IpfsPublicIPAddress  --vnet-name IpfsVNet --subnet AgSubnet --servers "$ACI_IP"
+
+az network vnet subnet create --name AzureFirewallSubnet --resource-group ipfs --vnet-name IpfsVnet --address-prefix 10.0.1.0/26
+
+
+#Firewall 
+az extension add --name azure-firewall
+az network firewall create --name ipfsFirewall --resource-group ipfs --location westeurope
+az network firewall ip-config create --firewall-name ipfsFirewall --name FW-config --public-ip-address IpfsPublicIPAddress --resource-group ipfs --vnet-name IpfsVNet
+az network route-table create  --name Firewall-rt-table  --resource-group ipfs --location westeurope  --disable-bgp-route-propagation true
+az network firewall update  --name myFirewall  --resource-group ipfs
+
+az network route-table route create  --resource-group ipfs  --name DG-Route  --route-table-name Firewall-rt-table  --address-prefix 0.0.0.0/0  --next-hop-type VirtualAppliance  --next-hop-ip-address 10.0.2.4
+az network vnet subnet update  --name IpfsSubnet --resource-group ipfs --vnet-name IpfsVNet --address-prefixes 10.0.0.0/24  --route-table Firewall-rt-table
+az network firewall nat-rule create  --firewall-name ipfsFirewall  --collection-name myNATCollection  --action dnat  --name myRule --protocols TCP  --source-addresses '*'  --destination-addresses 20.86.204.44 --destination-ports 80  --resource-group ipfs --translated-address 10.0.3.4 --translated-port 8080   --priority 200
+az network firewall application-rule create  --collection-name myAppCollection  --firewall-name ipfsFirewall  --name Allow-CheckIP  --protocols Http=80 Https=443 --resource-group ipfs --target-fqdns checkip.dyndns.org  --source-addresses 10.0.2.0/24  --priority 200  --action Allow
+
+
+#nat gateway alternative
+az network nat gateway create --resource-group ipfs --name IpfsGateway --public-ip-addresses IpfsPublicIPAddress --idle-timeout 10   
+az network vnet subnet update --resource-group ipfs --vnet-name IpfsVNet --name AzureFirewallSubnet  --nat-gateway IpfsGateway
+
+#app service
+az webapp config storage-account add --resource-group ipfs --name my-ipfs-gateway --custom-id nginxconf --storage-type AzureBlob --share-name nginx --account-name openminterdev --access-key "???" --mount-path /etc/nginx
+
+#LB
+az network lb create -g ipfs -n IpfsLb --sku Basic --vnet-name IpfsVNet --subnet AzureFirewallSubnet --private-ip-address 10.0.3.4 --public-ip-address IpfsPublicIPAddress

@@ -1,0 +1,78 @@
+apiVersion: 2018-10-01
+location: westeurope
+name: aci-ipfs-vnet
+properties:
+  containers:
+  - name: caddy
+    properties:
+      image: caddy
+      ports:
+      - port: 443
+        protocol: TCP
+      - port: 80
+        protocol: TCP     
+      resources:
+        requests:
+          cpu: 1.0
+          memoryInGB: 1.5
+      #command : [  "/usr/bin/caddy","--conf","/tmp/Caddyfile","--log","stdout"]
+      volumeMounts:
+      - name: caddyfile
+        mountPath: /etc/caddy
+      - name: certs
+        mountPath: /data
+      - name: config
+        mountPath: /config
+  - name: ipfs
+    properties:
+      image: ipfs/go-ipfs
+      ports:
+      - port: 4001
+      - port: 5001
+      - port: 8080
+      resources:
+        requests:
+          cpu: 1.0
+          memoryInGB: 1.5
+      volumeMounts:
+      - mountPath: /data/ipfs
+        name: ipfsdatavolume
+      - mountPath: /export
+        name: ipfsexportvolume
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    type: Private
+    ports:
+    - port: 4001
+    - port: 5001
+    - port: 8080
+    - port: 443
+    - port: 80
+    #dnsNameLabel: ipfs-example
+  networkProfile:
+    id: /subscriptions/???/resourceGroups/ipfs/providers/Microsoft.Network/networkProfiles/aci-network-profile-IpfsVNet-IpfsSubnet
+  volumes:
+  - secret:
+      Caddyfile: ???
+    name: caddyfile
+  - name: certs
+    azureFile:
+      sharename: certs
+      storageAccountName: ???
+      storageAccountKey: ???
+  - name: config
+    azureFile:
+      sharename: config
+      storageAccountName: ???
+      storageAccountKey: ???
+  - name: ipfsdatavolume
+    azureFile:
+      sharename: ipfsdata
+      storageAccountName: ???
+      storageAccountKey: ???
+  - name: ipfsexportvolume
+    azureFile:
+      sharename: ipfsexport
+      storageAccountName: ???
+      storageAccountKey: ???
